@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\File;
+use App\Models\FileMeta;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -101,15 +102,31 @@ class uploadController extends Controller
 
     public function list()
     {
-        //remove files that older than 15 minutes from storage and db
-        $files = File::where('created_at', '<', now()->subMinutes(15))->get();
-        $path = "public/stored_files";
-        foreach ($files as $file) {
-            Storage::delete($path . '/' . $file->name . '.' . $file->mimeType);
+        //delete files older than 15 minutes
+        $filesList = FileMeta::where('created_at', '<', now()->subMinutes(60))->get();
+        foreach ($filesList as $file) {
             $file->delete();
         }
 
-        $files = File::orderBy('created_at', 'desc')->get();
+
+        $filesList = FileMeta::orderBy('id', 'desc')->get();
+        $files = array();
+        foreach ($filesList as $file) {
+            if ($file->fileParts->count() == $file->partCount) {
+                $obj = new \stdClass();
+                $obj->id = $file->id;
+                $obj->hashCode = $file->hashCode;
+                $obj->name = $file->metas()->name;
+                $obj->size = $file->size;
+
+                array_push($files, $obj);
+            } else {
+                //delete meta
+                $file->delete();
+            }
+        }
+
+
         return view('list', compact("files"));
     }
 
@@ -122,5 +139,7 @@ class uploadController extends Controller
         $file->delete();
         return redirect()->route('list');
     }
+
+
 
 }

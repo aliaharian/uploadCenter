@@ -14,6 +14,7 @@
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.1.0/css/bootstrap.min.css">
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.form/4.2.2/jquery.form.js"></script>
+    <script src="/js/uploadChunk.js"></script>
     <style>
         .progress {
             position: relative;
@@ -45,55 +46,65 @@
                         <h4>Ali Aharian Uploader</h4>
                     </div>
                     <div class="card-body">
-                        <form method="POST" action="{{ url('upload') }}" enctype="multipart/form-data">
-                            @csrf
+                        {{-- <form id="uploadForm" method="POST" action="{{ url('upload') }}" enctype="multipart/form-data">
+                            @csrf --}}
 
-                            <div class="form-group">
-                                <input name="file" type="file" id="file" class="form-control"><br />
-                                <div class="progress">
-                                    <div class="bar"></div>
-                                    <div class="percent">0%</div>
-                                </div>
-                                <br>
-                                <input type="submit" value="Submit" class="btn btn-primary">
+                        <div class="form-group">
+                            <input name="file" type="file" id="file" class="form-control"><br />
+                            <div class="progress">
+                                <div style="transition:all 250ms" class="bar"></div>
+                                <div class="percent">0%</div>
                             </div>
-                        </form>
+                            <br>
+                            <input id="submitBtn" type="submit" value="Submit" class="btn btn-primary">
+                        </div>
+                        {{-- </form> --}}
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <script>
+    <script type="text/javascript">
+        let file;
         //check if file not grater than 5 mb
         document.getElementById('file').addEventListener('change', function() {
-            if (this.files[0].size > 15000000) {
+            if (this.files[0].size > 30000000) {
                 alert('File size is greater than 15MB');
                 this.value = "";
+            } else {
+                file = this.files[0];
             }
         });
-    </script>
 
-    <script type="text/javascript">
         $(function() {
+            var uploadChunk1 = new uploadFile(file);
             $(document).ready(function() {
                 var bar = $('.bar');
                 var percent = $('.percent');
-                $('form').ajaxForm({
-                    beforeSend: function() {
-                        var percentVal = '0%';
-                        bar.width(percentVal)
-                        percent.html(percentVal);
-                    },
-                    uploadProgress: function(event, position, total, percentComplete) {
-                        var percentVal = percentComplete + '%';
-                        bar.width(percentVal)
-                        percent.html(percentVal);
-                    },
-                    complete: function(xhr) {
-                        console.log("xhr",xhr.responseJSON.url);
-                        alert(xhr.responseJSON.url);
-                        window.location.href="/"
+                $('#submitBtn').click(async function() {
+                    if (!file) {
+                        alert('select file!')
+                    } else {
+                        uploadChunk1.setFile(file);
+                        let res = await uploadChunk1.upload();
+                        console.log('res', res)
+
+
+                    }
+                });
+                // Register progress listener
+                uploadChunk1.setProgressListener(function(progress) {
+                    // console.log('pro', progress)
+                    var percentVal = Math.ceil(progress) + '%';
+                    bar.width(percentVal);
+                    percent.html(percentVal);
+                    if (progress == 100) {
+                        setTimeout(() => {
+                            alert('upload successful!')
+                            window.location.href = "/"
+                        }, 500);
+
                     }
                 });
             });

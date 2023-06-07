@@ -69,8 +69,8 @@
         let file;
         //check if file not grater than 5 mb
         document.getElementById('file').addEventListener('change', function() {
-            if (this.files[0].size > 30000000) {
-                alert('File size is greater than 15MB');
+            if (this.files[0].size > 20*1024*1024) {
+                alert('File size is greater than 20MB');
                 this.value = "";
             } else {
                 file = this.files[0];

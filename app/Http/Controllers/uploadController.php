@@ -103,7 +103,7 @@ class uploadController extends Controller
     public function list()
     {
         //delete files older than 15 minutes
-        $filesList = FileMeta::where('created_at', '<', now()->subMinutes(60))->get();
+        $filesList = FileMeta::where('created_at', '<', now()->subMinutes(120))->get();
         foreach ($filesList as $file) {
             $file->delete();
         }
@@ -133,11 +133,22 @@ class uploadController extends Controller
     //delete file
     public function delete($id)
     {
-        $file = File::find($id);
-        $path = "public/stored_files";
-        Storage::delete($path . '/' . $file->name . '.' . $file->mimeType);
+        // $file = File::find($id);
+        // $path = "public/stored_files";
+        // Storage::delete($path . '/' . $file->name . '.' . $file->mimeType);
+        // $file->delete();
+        // return redirect()->route('list');
+
+
+        $file = FileMeta::where('hashCode', $id)->first();
+        if (!$file) {
+            return response()->json([
+                'message' => 'File not found',
+            ], 404);
+        }
         $file->delete();
         return redirect()->route('list');
+
     }
 
 

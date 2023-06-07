@@ -33,7 +33,12 @@
                 </div>
             </div>
             <p>Download in progress, Please wait...</p>
-
+            <div class="flex">
+                <button id="resumeBtn" class="hidden  mr-4 bg-blue-500 text-white px-4 py-3 rounded-[8px]">Continue
+                    Download</button>
+                <button id="cancelBtn" class=" bg-red-500 text-white px-4 py-3 rounded-[8px]">Cancel
+                </button>
+            </div>
         </div>
     </div>
 
@@ -86,7 +91,7 @@
                             </td>
 
                             <td class="border px-4 py-2">
-                                <form action="{{ route('delete', $file->id) }}" method="post">
+                                <form action="{{ route('delete', $file->hashCode) }}" method="post">
                                     @csrf
                                     @method('delete')
                                     <input type="submit" value="Delete"
@@ -103,7 +108,27 @@
 
         <script>
             let hashCode = null;
+            let errorResponse = null;
             let downloadChunk = new downloadFile();
+            percent = $('#middle-circle')
+            bar = $('#progress-spinner')
+
+            function handleDownloadResponse(res) {
+                if (res.type == "success") {
+                    errorResponse = null
+                    downloadURI(res.url, res.name)
+                }
+                if (res.type == 'error') {
+                    if (res.fileMeta) {
+                        errorResponse = res;
+                        $("#resumeBtn").css('display', 'flex')
+                    } else {
+                        alert("دانلود با خطا مواجه شد. لطفا مجددا تلاش کنید.");
+                        $("#uploadProgressDialog").css('display', 'none')
+                    }
+                }
+            }
+
             async function handleStartDownload(hash) {
                 hashCode = hash;
                 console.log('hash', hash)
@@ -111,9 +136,7 @@
                 downloadChunk.setHashCode(hash);
                 let res = await downloadChunk.download();
                 console.log('res', res)
-                //download res url
-                downloadURI(res.url, res.name)
-
+                handleDownloadResponse(res)
             }
 
             function downloadURI(uri, name) {
@@ -124,15 +147,37 @@
                 link.click();
                 document.body.removeChild(link);
                 delete link;
+                $("#uploadProgressDialog").css('display', 'none')
+
             }
 
             $(function() {
                 $(document).ready(function() {
+                    $("#cancelBtn").click(async () => {
+                        downloadChunk.handleCancelDownload();
+                        $("#resumeBtn").css('display', 'none')
+                        $("#uploadProgressDialog").css('display', 'none')
+                        hashCode = null;
+                        errorResponse = null;
+                        let percentVal = "0%"
+                        bar.css("background",
+                            `conic-gradient(rgb(3, 133, 255) ${percentVal}, rgb(242, 242, 242) ${percentVal})`
+                        );
+                        percent.html(percentVal);
+
+
+                    });
+                    $("#resumeBtn").click(async () => {
+                        $("#resumeBtn").css('display', 'none')
+
+                        let res = await downloadChunk.resumeDownload(errorResponse.chunkNumber)
+                        handleDownloadResponse(res)
+                    });
+
                     // Register progress listener
                     downloadChunk.setProgressListener(function(progress) {
                         // console.log('pro', progress)
-                        percent = $('#middle-circle')
-                        bar = $('#progress-spinner')
+
                         var percentVal = Math.ceil(progress) + '%';
                         bar.css("background",
                             `conic-gradient(rgb(3, 133, 255) ${percentVal}, rgb(242, 242, 242) ${percentVal})`

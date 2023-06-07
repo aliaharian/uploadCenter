@@ -51,8 +51,11 @@ class UploadChunkController extends Controller
                 'message' => 'File not found',
             ], 404);
         }
+        $compressed = gzdeflate(json_encode($request->data), 9);
+        // $compressed = gzdeflate($compressed, 9);
+        // return $compressed;
         $filePart = $fileMeta->fileParts()->create([
-            'data' => json_encode($request->data),
+            'data' => $compressed,
             'offset' => $request->offset,
         ]);
 
@@ -98,14 +101,18 @@ class UploadChunkController extends Controller
             ], 404);
         }
 
+
+        // return $filePart->data;
+        $dec = gzinflate($filePart->data);
+
         return response()->json(
             [
-                'data' => $filePart->data,
+                'data' => $dec,
                 'finished' => $filePart->offset + 1 == $fileMeta->partCount,
                 'bytes_downloaded' => min(($filePart->offset + 1) * env('UPLOAD_CHUNK'), $fileMeta->size),
-                'total_bytes' => $fileMeta->size,
-                'chunk' => (int) env('UPLOAD_CHUNK'),
-                'next_offset' => $filePart->offset + 1 == $fileMeta->partCount ? null : $filePart->offset + 1,
+                // 'total_bytes' => $fileMeta->size,
+                // 'chunk' => (int) env('UPLOAD_CHUNK'),
+                // 'next_offset' => $filePart->offset + 1 == $fileMeta->partCount ? null : $filePart->offset + 1,
             ]
         );
 

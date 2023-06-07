@@ -15,11 +15,14 @@ class CreateFilePartsTable extends Migration
     {
         Schema::create('file_parts', function (Blueprint $table) {
             $table->id();
-            $table->json('data');
+            // $table->binary('data');
             $table->foreignId('file_meta_id')->constrained('file_metas')->onDelete('cascade')->onUpdate('cascade');
             $table->unsignedBigInteger('offset');
             $table->timestamps();
         });
+        DB::statement("ALTER TABLE file_parts ADD data LONGBLOB");
+
+
     }
 
     /**

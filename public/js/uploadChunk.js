@@ -26,7 +26,7 @@ class uploadFile {
 
     async upload() {
         await this.uploadMeta();
-        const BYTES_PER_CHUNK = 128 * 1024; // 256KB chunk sizes.
+        const BYTES_PER_CHUNK = 64 * 1024; // 256KB chunk sizes.
         const SIZE = file.size;
         var partCount = this.fileMeta.partCount;
         var hashCode = this.fileMeta.hashCode;

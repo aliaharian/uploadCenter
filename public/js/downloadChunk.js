@@ -10,6 +10,7 @@ class downloadFile {
         this.downloadError = false;
         this.downloadDone = false;
         this.progressListener = null; // Event listener for progress updates
+        this.cancelDownload = false;
     }
 
     setProgressListener(listener) {
@@ -25,55 +26,76 @@ class downloadFile {
         this.hashCode = hashCode;
     }
 
-    async download() {
-        await this.downloadMeta();
+    async download(start = 0) {
+        this.cancelDownload = false;
+        try {
+            let metaResponse = await this.downloadMeta(start);
+            if (metaResponse) {
+                console.log(metaResponse);
+                alert("دانلود با خطا مواجه شد. لطفا مجددا تلاش کنید.");
 
-        const BYTES_PER_CHUNK = 128 * 1024; // 256KB chunk sizes.
+                return {
+                    type: "error",
+                    fileMeta: this.fileMeta,
+                    chunkNumber: metaResponse.errorOffset,
+                    byteArraysFile: this.byteArraysFile,
+                };
+            }
+        } catch (e) {
+            alert("دانلود با خطا مواجه شد. لطفا مجددا تلاش کنید.");
+
+            return {
+                type: "error",
+                fileMeta: this.fileMeta,
+                chunkNumber: e.errorOffset,
+                byteArraysFile: this.byteArraysFile,
+            };
+        }
+
         const fileMeta = this.fileMeta;
         const SIZE = fileMeta.size;
         var partCount = fileMeta.partCount;
         var hashCode = fileMeta.hashCode;
         var fileType = fileMeta.mimeType;
-        for (let i = 0; i < partCount; i++) {
-            // let buffer = await file
-            //     .slice(BYTES_PER_CHUNK * i, BYTES_PER_CHUNK * (i + 1))
-            //     .arrayBuffer();
-            // let typedArray = new Uint8Array(buffer);
+        for (let i = start; i < partCount; i++) {
+            if (!this.cancelDownload) {
+                const data = {
+                    hashCode: hashCode,
+                    offset: i,
+                };
 
-            // let array = [...typedArray];
-
-            // if (this.byteArraysFile.length === 0) {
-            //     this.byteArraysFile = array;
-            // } else {
-            //     this.byteArraysFile = this.byteArraysFile.concat(array);
-            // }
-
-            const data = {
-                hashCode: hashCode,
-                offset: i,
-            };
-
-            try {
-                await this.partDownload(data).then((resolve) => {
-                    if (this.byteArraysFile.length === 0) {
-                        this.byteArraysFile = JSON.parse(resolve.data);
-                    } else {
-                        this.byteArraysFile = this.byteArraysFile.concat(
-                            JSON.parse(resolve.data)
-                        );
-                    }
-                    this.bytesDownloaded = resolve.bytes_downloaded;
-                    this.downloadPercent =
-                        (resolve.bytes_downloaded / SIZE) * 100;
-                    this.downloadDone = resolve.finished;
-                    this.downloadError = false;
-                    this.updateProgress();
-                });
-            } catch (e) {
-                console.log("ey vay!", e);
-                this.downloadError = true;
-                alert("دانلود با خطا مواجه شد. لطفا مجددا تلاش کنید.");
-                break;
+                try {
+                    await this.partDownload(data).then((resolve) => {
+                        if (this.byteArraysFile.length === 0) {
+                            this.byteArraysFile = JSON.parse(resolve.data);
+                        } else {
+                            this.byteArraysFile = this.byteArraysFile.concat(
+                                JSON.parse(resolve.data)
+                            );
+                        }
+                        this.bytesDownloaded = resolve.bytes_downloaded;
+                        this.downloadPercent =
+                            (resolve.bytes_downloaded / SIZE) * 100;
+                        this.downloadDone = resolve.finished;
+                        this.downloadError = false;
+                        this.updateProgress();
+                    });
+                } catch (e) {
+                    console.log("ey vay!", e);
+                    this.downloadError = true;
+                    alert("دانلود با خطا مواجه شد. لطفا مجددا تلاش کنید.");
+                    return {
+                        type: "error",
+                        fileMeta: fileMeta,
+                        chunkNumber: e.offset,
+                        byteArraysFile: this.byteArraysFile,
+                    };
+                    break;
+                }
+            } else {
+                return {
+                    type: "cancel",
+                };
             }
         }
 
@@ -83,25 +105,45 @@ class downloadFile {
         var imageUrl = URL.createObjectURL(blob);
         console.log("bytearr", this.byteArraysFile);
         return {
+            type: this.downloadError ? "error" : "success",
             url: imageUrl,
             name: fileMeta.name,
-            // blob: blob,
-            // byteArr: this.byteArraysFile,
-            // fileType: fileType,
         };
     }
+    async handleCancelDownload() {
+        this.file = null;
+        this.hashCode = null;
+        this.fileMeta = null;
+        this.byteArraysFile = [];
+        this.bytesDownloaded = 0;
+        this.downloadPercent = 0;
+        this.downloadError = false;
+        this.downloadDone = false;
+        this.cancelDownload = true;
+    }
 
-    async downloadMeta() {
+    async resumeDownload(chunkNumber) {
+        var response = await this.download(chunkNumber);
+        return response;
+    }
+
+    async downloadMeta(offset) {
         let response;
-        await $.post(
-            "api/fileMeta/view",
-            {
-                hashCode: this.hashCode,
-            },
-            function (res) {
-                response = res;
-            }
-        );
+        try {
+            await $.post(
+                "api/fileMeta/view",
+                {
+                    hashCode: this.hashCode,
+                },
+                function (res) {
+                    response = res;
+                }
+            );
+        } catch (e) {
+            return {
+                errorOffset: offset,
+            };
+        }
         this.fileMeta = response;
     }
 
@@ -126,14 +168,16 @@ class downloadFile {
                     },
                     error: function (e) {
                         console.log("error", e);
-                        reject(e);
+                        reject({ offset: data.offset });
                     },
                 });
                 return response;
             });
         } catch (e) {
             console.log("error", e);
-            throw e;
+            throw {
+                offset: data.offset,
+            };
         }
     }
 
